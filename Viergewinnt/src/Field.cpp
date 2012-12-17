@@ -53,7 +53,13 @@ bool Field::insert( int col, int player )
 
 void Field::draw()
 {
-	
+	for(int y=FIELD_HEIGHT-1; y>=0; --y)
+	{
+		for(int x=0; x<FIELD_WIDTH; ++x)
+		{
+			m_tiles[x][y]->drawAt(x,y);
+		}
+	}
 }
 
 void Field::print() const
