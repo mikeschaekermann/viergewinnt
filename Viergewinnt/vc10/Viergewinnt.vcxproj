@@ -105,6 +105,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\NetworkManager.cpp" />
+    <ClCompile Include="..\src\Field.cpp" />
+    <ClCompile Include="..\src\Tile.cpp" />
     <ClCompile Include="..\src\ViergewinntApp.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -112,6 +114,8 @@
     <ClInclude Include="..\src\MessageHandler.h" />
     <ClInclude Include="..\src\MessageHandlerJSON.h" />
     <ClInclude Include="..\src\NetworkManager.h" />
+    <ClInclude Include="..\src\Field.h" />
+    <ClInclude Include="..\src\Tile.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resources.rc" />

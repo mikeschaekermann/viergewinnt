@@ -57,10 +57,9 @@ NetworkManager::NetworkManager(void) :
 	loopbackEndpoint(ip::address_v4::loopback(), LISTENING_PORT),
 	unicastEndpoint(ip::address_v4::loopback(), LISTENING_PORT),
 	broadcastEndpoint(ip::address_v4::broadcast(), LISTENING_PORT),
-	socket(ioService, unicastEndpoint)
+	socket(ioService, ip::udp::endpoint(ip::udp::v4(), LISTENING_PORT))
 {
-	boost::asio::socket_base::broadcast option(true);
-	socket.set_option(option);
+	socket.set_option(socket_base::broadcast(true));
 }
 
 
