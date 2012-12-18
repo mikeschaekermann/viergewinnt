@@ -11,3 +11,9 @@
 *.lai
 *.la
 *.a
+
+Debug
+*.opensdf
+*.sdf
+*.suo
+*.ipch
