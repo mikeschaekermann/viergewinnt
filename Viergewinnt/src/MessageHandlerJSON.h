@@ -8,11 +8,11 @@ class MessageHandlerJSON :
 	public MessageHandler
 {
 public:
-	virtual void		handle(std::string message);
-	virtual void		handle(boost::property_tree::ptree propertyTree) = 0;
+	virtual void		handle(std::string message, boost::asio::ip::udp::endpoint from);
+	virtual void		handle(boost::property_tree::ptree message, boost::asio::ip::udp::endpoint from) = 0;
 };
 
-void MessageHandlerJSON::handle(std::string message)
+void MessageHandlerJSON::handle(std::string message, boost::asio::ip::udp::endpoint from)
 {
 	try
 	{
@@ -22,7 +22,10 @@ void MessageHandlerJSON::handle(std::string message)
 		boost::property_tree::ptree propertyTree;
 		boost::property_tree::read_json(inputStream, propertyTree);
 
-		handle(propertyTree);
+		if (propertyTree.get<int>("version") == VERSION_NUMBER)
+		{
+			handle(propertyTree, from);
+		}
 	}
 	catch (std::exception const& e)
 	{

@@ -48,6 +48,13 @@ void NetworkManager::Message::broadcast()
 	delete this;
 }
 
+void NetworkManager::Message::send(ip::udp::endpoint & endpoint)
+{
+	networkManager.send(message, endpoint);
+
+	delete this;
+}
+
 /************************************************************************/
 /* NETWORK MANAGER                                                      */
 /************************************************************************/
@@ -70,7 +77,16 @@ NetworkManager::~NetworkManager(void)
 
 NetworkManager::Message & NetworkManager::createMessage()
 {
-	return (*new Message(*this));
+	auto message = new Message(*this);
+	message->add("version", VERSION_NUMBER);
+	message->add("clienttype", CLIENT_TYPE);
+	
+	return (*message);
+}
+
+void NetworkManager::setUnicastEndpoint(const ip::udp::endpoint & endpoint)
+{
+	unicastEndpoint = endpoint;
 }
 
 void NetworkManager::unicast(string const & message)
@@ -136,20 +152,47 @@ void NetworkManager::listenThreadFunction()
 			console()	<< "new message: " << std::endl
 						<< buffer.c_array() << std::endl;
 
+			handlerMutex.lock();
+
 			for (auto it = handlers.begin(); it != handlers.end(); ++it)
 			{
-				(*it)->handle(message);
+				(*it)->handle(message, remote_endpoint);
 			}
+
+			handlerMutex.unlock();
 		}
 	}
 }
 
 void NetworkManager::subscribe(MessageHandler & handler)
 {
+	handlerMutex.lock();
+
 	handlers.insert(&handler);
+
+	handlerMutex.unlock();
 }
 
 void NetworkManager::unsubscribe(MessageHandler & handler)
 {
+	handlerMutex.lock();
+
 	handlers.erase(&handler);
+
+	handlerMutex.unlock();
+}
+
+void NetworkManager::unsubscribeAll()
+{
+	handlerMutex.lock();
+
+	handlers.clear();
+
+	handlerMutex.unlock();
+}
+
+void NetworkManager::subscribeExclusively(MessageHandler & handler)
+{
+	unsubscribeAll();
+	subscribe(handler);
 }

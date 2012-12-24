@@ -8,6 +8,6 @@ using namespace ci::app;
 class MessageHandler
 {
 public:
-	virtual void		handle(std::string message) = 0;
+	virtual void		handle(std::string message, boost::asio::ip::udp::endpoint from) = 0;
 };
 
