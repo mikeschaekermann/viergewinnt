@@ -68,6 +68,7 @@ private:
 	ip::udp::socket			socket;
 
 	ip::udp::endpoint		loopbackEndpoint;
+	ip::udp::endpoint		ownPublicEndpoint;
 	ip::udp::endpoint		unicastEndpoint;
 	ip::udp::endpoint		broadcastEndpoint;
 	

@@ -6,9 +6,10 @@
 
 using namespace ci;
 
-const ci::Color Tile::m_emptyColor = ci::Color(1,1,1);
-const ci::Color Tile::m_p0Color	  = ci::Color(1,1,0);
-const ci::Color Tile::m_p1Color	  = ci::Color(1,0,0);
+const ci::Color Tile::m_emptyColor = ci::Color(0.1, 0.1, 0.1);
+const ci::Color Tile::m_p0Color	  = ci::Color(0.7,0.7,0);
+const ci::Color Tile::m_p1Color	  = ci::Color(0.7,0,0);
+const ci::Color Tile::m_selectionColor = ci::Color(0.3, 0.3, 1);
 
 Tile::Tile(void) : 
 	m_isEmpty(true), m_player(-1)
@@ -37,14 +38,19 @@ void Tile::setPlayer( int n )
 	m_player = n;
 }
 
+bool Tile::belongsToPlayer(int n) const
+{
+	return (m_player == n);
+}
+
 void Tile::draw()
 {
 	
 }
 
-void Tile::drawAt( int x, int y )
+void Tile::drawAt( int x, int y, bool active )
 {
-	Vec2f where(x*TILE_WIDTH, y*TILE_HEIGHT);
+	Vec2f where(x*TILE_WIDTH + OFFSET_LEFT, y*TILE_HEIGHT + OFFSET_TOP);
 	Rectf rec(where, where+Vec2f(TILE_WIDTH, TILE_HEIGHT));
 
 	Color color;
@@ -64,6 +70,12 @@ void Tile::drawAt( int x, int y )
 	}
 	gl::color(color);
 	gl::drawSolidRect(rec);
+
+	if (active)
+	{
+		gl::color(m_selectionColor);
+		gl::drawStrokedRect(rec);
+	}
 }
 
 std::string Tile::toString() const

@@ -2,7 +2,8 @@
 
 #include "cinder/app/App.h"
 
-Field::Field(void)
+Field::Field(void) :
+	activeColumn(0)
 {
 
 }
@@ -36,14 +37,55 @@ bool Field::isFull( int col ) const
 	return true;
 }
 
-bool Field::insert( int col, int player )
+bool Field::isFull() const
 {
+	for (int x = 0; x < FIELD_WIDTH; ++x)
+	{
+		if (!isFull(x)) return false;
+	}
+
+	return true;
+}
+
+void Field::activateNext()
+{
+	++activeColumn;
+
+	if (activeColumn > FIELD_WIDTH - 1)
+	{
+		activeColumn = 0;
+	}
+}
+
+void Field::activatePrev()
+{
+	--activeColumn;
 	
+	if (activeColumn < 0)
+	{
+		activeColumn = FIELD_WIDTH - 1;
+	}
+}
+
+unsigned int Field::getActiveColumn()
+{
+	return (activeColumn + 1);
+}
+
+bool Field::insert(int player)
+{
+	return insert(activeColumn + 1, player);
+}
+
+bool Field::insert(int col, int player)
+{
+	int column = col - 1;
+
 	for(int y=0; y<FIELD_HEIGHT; ++y)
 	{
-		if(m_tiles[col][y]->isEmpty())
+		if(m_tiles[column][y]->isEmpty())
 		{
-			m_tiles[col][y]->setPlayer(player);
+			m_tiles[column][y]->setPlayer(player);
 			return true;
 		}
 	}
@@ -57,7 +99,7 @@ void Field::draw()
 	{
 		for(int x=0; x<FIELD_WIDTH; ++x)
 		{
-			m_tiles[x][y]->drawAt(x,y);
+			m_tiles[x][y]->drawAt(x, FIELD_HEIGHT-1-y, x == activeColumn);
 		}
 	}
 }
@@ -72,4 +114,90 @@ void Field::print() const
 		}
 		ci::app::console() << std::endl;
 	}
+}
+
+int Field::getWinner() const
+{
+	for (int p = 0; p <= 1; ++p)
+	{
+		for (int sx = 0; sx < FIELD_WIDTH; ++sx)
+		{
+			for (int sy = 0; sy < FIELD_HEIGHT; ++sy)
+			{
+				/// check for horizontal row
+
+				int counter = 0;
+
+				for (int x = sx; x < FIELD_WIDTH; ++x)
+				{
+					if (m_tiles[x][sy]->belongsToPlayer(p) && counter < 4)
+					{
+						++counter;
+					}
+					else
+					{
+						break;
+					}
+				}
+
+				if (counter == 4) return p;
+
+				/// check for vertical row
+
+				counter = 0;
+
+				for (int y = sy; y < FIELD_HEIGHT; ++y)
+				{
+					if (m_tiles[sx][y]->belongsToPlayer(p) && counter < 4)
+					{
+						++counter;
+					}
+					else
+					{
+						break;
+					}
+				}
+
+				if (counter == 4) return p;
+
+				/// check for diagonal row from top left to bottom right
+
+				counter = 0;
+
+				for (int y = sy, x = sx; y >= 0 && x < FIELD_WIDTH; --y, ++x)
+				{
+					if (m_tiles[x][y]->belongsToPlayer(p) && counter < 4)
+					{
+						++counter;
+					}
+					else
+					{
+						break;
+					}
+				}
+
+				if (counter == 4) return p;
+
+				/// check for diagonal row from bottom left to up right
+
+				counter = 0;
+
+				for (int y = sy, x = sx; y < FIELD_HEIGHT && x < FIELD_WIDTH; ++y, ++x)
+				{
+					if (m_tiles[x][y]->belongsToPlayer(p) && counter < 4)
+					{
+						++counter;
+					}
+					else
+					{
+						break;
+					}
+				}
+
+				if (counter == 4) return p;
+			}
+		}
+	}
+
+	return -1;
 }

@@ -117,6 +117,7 @@
     <ClInclude Include="..\src\Field.h" />
     <ClInclude Include="..\src\Stage.h" />
     <ClInclude Include="..\src\StageFindOpponent.h" />
+    <ClInclude Include="..\src\StageGameOver.h" />
     <ClInclude Include="..\src\StagePlay.h" />
     <ClInclude Include="..\src\Tile.h" />
   </ItemGroup>

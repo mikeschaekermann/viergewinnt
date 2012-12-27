@@ -5,6 +5,7 @@
 #include "NetworkManager.h"
 #include "Stage.h"
 #include "StageFindOpponent.h"
+#include "cinder/params/Params.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -21,16 +22,18 @@ public:
 	NetworkManager & getNetworkManager();
 
 private:
-	NetworkManager networkManager;
-	Stage * stage;
+	NetworkManager			networkManager;
+	params::InterfaceGl		parameterMenu;
+	Stage *					stage;
 };
 
 void ViergewinntApp::setup()
 {
 	networkManager.listen();
-	
+	parameterMenu = params::InterfaceGl("Please enter your ...", Vec2f(200, 150));
 	stage = nullptr;
-	setStage(new StageFindOpponent(networkManager));
+
+	setStage(new StageFindOpponent(networkManager, parameterMenu));
 }
 
 void ViergewinntApp::mouseDown(MouseEvent event)
@@ -47,9 +50,9 @@ void ViergewinntApp::update()
 {
 	stage->update();
 
-	if (stage->isCancelled())
+	if (stage->isAborted())
 	{
-		setStage(new StageFindOpponent(networkManager));
+		setStage(new StageFindOpponent(networkManager, parameterMenu, true, stage->wasAbortedByOpponent()));
 	}
 	else if (stage->isComplete())
 	{

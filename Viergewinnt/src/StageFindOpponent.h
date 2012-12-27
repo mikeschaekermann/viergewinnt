@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Stage.h"
-#include "cinder/params/Params.h"
 #include "StagePlay.h"
 
 class StageFindOpponent :
@@ -85,16 +84,27 @@ public:
 		const double					secondsToWaitForInvitationReply;
 	};
 
-	StageFindOpponent(NetworkManager & networkManager) :
-		Stage(networkManager, 1),
+	StageFindOpponent(NetworkManager & networkManager, params::InterfaceGl & parameterMenu, bool createdAfterAbortion = false, bool opponentAborted = false) :
+		Stage(networkManager, parameterMenu, 1, opponentAborted),
+		createdAfterAbortion(createdAfterAbortion),
 		secondsToWaitForNextBroadcast(2),
 		secondsToLive(10),
 		playerName("Mike"),
 		activeOpponent(opponents.end()),
-		parameterMenu("Please enter your ...", Vec2i( 200, 100 ))
+		abortionConfirmationCounter(0),
+		maxNumOfAbortionConfirmations(5),
+		abortionConfirmed(false)
 	{
+		srand(time(NULL));
+		localIdentificationNumber = rand() % 100000000;
+		
 		sendReadinessMessage();
 		parameterMenu.addParam("name", &playerName);
+	}
+
+	~StageFindOpponent()
+	{
+		parameterMenu.removeParam("name");
 	}
 
 	virtual void mouseDown(MouseEvent event)
@@ -142,7 +152,7 @@ public:
 				{
 					sendInvitationReplyMessage(activeOpponent->endpoint);
 					console() << "YOU ACCEPTED AN INVITATION!" << std::endl;
-					nextStage = new StagePlay(networkManager, false, playerName, activeOpponent->name, activeOpponent->endpoint);
+					nextStage = new StagePlay(networkManager, parameterMenu, false, playerName, activeOpponent->name, activeOpponent->endpoint);
 				}
 				else if (!activeOpponent->isInvited())
 				{
@@ -168,6 +178,8 @@ public:
 				}
 
 				opponents.erase(it);
+
+				if (opponents.size() == 0) break;
 			}
 			else
 			{
@@ -191,6 +203,19 @@ public:
 					sendInvitationMessage(it->endpoint);
 				}
 			}
+
+			if (createdAfterAbortion)
+			{
+				if (
+						/// abortion needs to be confirmed by myself or ...
+						(opponentAborted && abortionConfirmationCounter < maxNumOfAbortionConfirmations) ||
+						/// I am still waiting for abortion confirmation
+						(!opponentAborted && !abortionConfirmed)
+					)
+				{
+					sendAbortionMessage();
+				}
+			}
 		}
 	}
 
@@ -198,7 +223,7 @@ public:
 	{
 		Vec2f textPosition(230, 20);
 
-		drawString("List of players (navigate with arrow keys, then press return!)", textPosition);
+		drawString("List of players (navigate with arrow keys, then press return!)", textPosition, textColor, textFont);
 
 		textPosition.y += 50;
 
@@ -212,10 +237,10 @@ public:
 			}
 			else
 			{
-				color = ColorA(1, 1, 1, 1);
+				color = textColor;
 			}
 
-			drawString(it->toString(), textPosition, color);
+			drawString(it->toString(), textPosition, color, textFont);
 			textPosition.y += 30;
 		}
 
@@ -226,33 +251,50 @@ private:
 	boost::mutex				opponentsMutex;
 	list<Player>				opponents;
 	list<Player>::iterator		activeOpponent;
-	params::InterfaceGl			parameterMenu;
 	const double				secondsToLive,
 								secondsToWaitForNextBroadcast;
 	string						playerName;
+	unsigned int				localIdentificationNumber;
+	bool						createdAfterAbortion;
+	unsigned int				abortionConfirmationCounter,
+								maxNumOfAbortionConfirmations;
+	bool						abortionConfirmed;
 
 	void handle(boost::property_tree::ptree message, boost::asio::ip::udp::endpoint from)
 	{
-		Player opponent(message.get<string>("clientname"), from);
-
-		auto existingOpponent = find(opponents.begin(), opponents.end(), opponent);
+		auto existingOpponent = find(opponents.begin(), opponents.end(), Player("", from));
 
 		auto stage = message.get<int>("stage");
 		
 		if (stage == stageIndex)
 		{
-			opponentsMutex.lock();
+			bool isMessageFromMyself = false;
 
-			if (existingOpponent != opponents.end())
+			try
 			{
-				existingOpponent->refresh(opponent);
+				auto senderID = message.get<unsigned int>("senderid");
+				isMessageFromMyself = senderID != localIdentificationNumber;
 			}
-			else
+			catch (...)
 			{
-				opponents.push_back(opponent);
-			}
+				if (!isMessageFromMyself)
+				{
+					Player opponent(message.get<string>("clientname"), from);
 
-			opponentsMutex.unlock();
+					opponentsMutex.lock();
+
+					if (existingOpponent != opponents.end())
+					{
+						existingOpponent->refresh(opponent);
+					}
+					else
+					{
+						opponents.push_back(opponent);
+					}
+
+					opponentsMutex.unlock();
+				}
+			}
 		}
 		else if (stage == stageIndex + 1)
 		{
@@ -261,7 +303,7 @@ private:
 				if (existingOpponent->isInvited())
 				{
 					console() << "YOUR INVITATION WAS ACCEPTED!" << std::endl;
-					nextStage = new StagePlay(networkManager, true, playerName, existingOpponent->name, existingOpponent->endpoint);
+					nextStage = new StagePlay(networkManager, parameterMenu, true, playerName, existingOpponent->name, existingOpponent->endpoint);
 				}
 				else
 				{
@@ -270,9 +312,14 @@ private:
 			}
 			else
 			{
+				Player opponent(message.get<string>("clientname"), from);
 				opponent.inviting = true;
 				opponents.push_back(opponent);
 			}
+		}
+		else if (stage == ABORTION_STAGE)
+		{
+			abortionConfirmed = true;
 		}
 	}
 
@@ -282,6 +329,7 @@ private:
 			.createMessage()
 			.add("stage", stageIndex)
 			.add("clientname", playerName)
+			.add("senderid", localIdentificationNumber)
 			.makeJSON()
 			.broadcast();
 	}
@@ -303,5 +351,18 @@ private:
 			.add("stage", (stageIndex + 1))
 			.makeJSON()
 			.send(endpoint);
+	}
+
+	void sendAbortionMessage()
+	{
+		networkManager
+			.createMessage()
+			.add("stage", 99)
+			.makeJSON()
+			.unicast();
+
+		++abortionConfirmationCounter;
+
+		console() << "ABORTION MESSAGE SENT!" << std::endl;
 	}
 };

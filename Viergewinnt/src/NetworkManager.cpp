@@ -103,7 +103,7 @@ void NetworkManager::send(string const & message, const ip::udp::endpoint & endp
 {
 	boost::system::error_code error;
 
-	socket.send_to(buffer(message.c_str(), message.size() + 1), endpoint, 0, error);
+	socket.send_to(buffer(message.c_str(), message.size()), endpoint, 0, error);
 
 	if (error && error != boost::asio::error::message_size)
 	{
@@ -125,9 +125,15 @@ void NetworkManager::numb()
 
 void NetworkManager::listenThreadFunction()
 {
-	boost::array<char, MAX_MESSAGE_LENGTH_IN_BYTES> buffer;
 	while (true)
 	{
+		boost::array<char, MAX_MESSAGE_LENGTH_IN_BYTES> buffer;
+
+		for (unsigned int i = 0; i < MAX_MESSAGE_LENGTH_IN_BYTES; ++i)
+		{
+			buffer[i] = 0;
+		}
+
 		ip::udp::endpoint remote_endpoint;
 		boost::system::error_code error;
 
