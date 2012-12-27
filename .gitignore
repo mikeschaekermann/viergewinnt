@@ -12,9 +12,20 @@
 *.la
 *.a
 
-Debug
-Release
 *.opensdf
 *.sdf
 *.suo
 *.ipch
+
+# Build folders
+*.tlog
+*.obj
+*.res
+*.manifest
+*.ilk
+*.lastbuildstate
+*.log
+*.pdb
+*.rc
+*.idb
+*.map
