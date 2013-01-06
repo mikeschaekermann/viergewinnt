@@ -18,7 +18,7 @@ using namespace boost::asio;
 #define MAX_MESSAGE_LENGTH_IN_BYTES 5000
 #define TERMINATION_MESSAGE "__________TERMINATE__________"
 #define CLIENT_TYPE 0
-#define VERSION_NUMBER 1
+#define VERSION_NUMBER 2
 
 class NetworkManager
 {

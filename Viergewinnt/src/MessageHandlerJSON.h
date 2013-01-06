@@ -22,6 +22,7 @@ void MessageHandlerJSON::handle(std::string message, boost::asio::ip::udp::endpo
 		boost::property_tree::ptree propertyTree;
 		boost::property_tree::read_json(inputStream, propertyTree);
 
+		/// ignore messages from clients with a version number different from mine
 		if (propertyTree.get<int>("version") == VERSION_NUMBER)
 		{
 			handle(propertyTree, from);

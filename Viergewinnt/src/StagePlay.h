@@ -11,22 +11,25 @@ public:
 	StagePlay(NetworkManager & networkManager, params::InterfaceGl & parameterMenu, bool begins, string myName, string opponentName, boost::asio::ip::udp::endpoint opponentEndpoint) :
 		Stage(networkManager, parameterMenu, 3),
 		myTurn(begins),
-		receiveMoves(!myTurn),
 		hasBegun(false),
 		keepSendingReadinessMessages(true),
 		myName(myName),
 		myLastMove(1),
+		myLastTurnNumber(-1),
+		opponentsLastTurnNumber(-1),
 		winner(-1),
 		instruction("Move: arrow keys; Choose: enter; Tipp: "),
 		opponentName(opponentName),
+		opponentEndpoint(opponentEndpoint),
 		secondsToWaitForNextMessage(2),
 		secondsToWaitForNextCommunication(10),
 		secondsToWaitForNextMove(30),
-		secondsToWaitToReceiveMovesAfterOwnMove(2.5 * secondsToWaitForNextMessage),
 		secondsToWaitBeforeGameOverStage(2.5 * secondsToWaitForNextMessage)
 	{
 		networkManager.setUnicastEndpoint(opponentEndpoint);
+		
 		noMoveTimer.start();
+		noCommunicationTimer.start();
 		
 		field.init();
 	}
@@ -53,18 +56,15 @@ public:
 					if (field.insert(1))
 					{
 						myTurn = false;
-						receiveMoves = false;
-
-						noCommunicationTimer.stop();
+						++myLastTurnNumber;
 
 						noMoveTimer.stop();
 						noMoveTimer.start();
 
-						noMoveReceptionTimer.stop();
-						noMoveReceptionTimer.start();
-
 						myLastMove = field.getActiveColumn();
 						console() << "COLUMN " << myLastMove << " WAS CHOSEN!" << std::endl;
+
+						sendMoveMessage(myLastMove);
 
 						checkForWinner();
 					}
@@ -90,11 +90,6 @@ public:
 
 	virtual void update()
 	{
-		if (noMoveReceptionTimer.getSeconds() >= secondsToWaitToReceiveMovesAfterOwnMove)
-		{
-			receiveMoves = true;
-		}
-
 		if (stageTimer.getSeconds() >= secondsToWaitForNextMessage)
 		{
 			if (keepSendingReadinessMessages)
@@ -102,7 +97,7 @@ public:
 				sendReadinessMessage();
 			}
 
-			if (hasBegun && !myTurn)
+			if (hasBegun)
 			{
 				sendMoveMessage(myLastMove);
 			}
@@ -155,89 +150,81 @@ private:
 	const double				secondsToWaitForNextMessage,
 								secondsToWaitForNextCommunication,
 								secondsToWaitForNextMove,
-								secondsToWaitToReceiveMovesAfterOwnMove,
 								secondsToWaitBeforeGameOverStage;
 	cinder::Timer				noCommunicationTimer,
 								noMoveTimer,
-								noMoveReceptionTimer,
 								gameOverTimer;
 	string						myName,
 								opponentName,
 								instruction;
+	const ip::udp::endpoint		opponentEndpoint;
 	bool						hasBegun,
 								myTurn,
-								receiveMoves,
 								keepSendingReadinessMessages;
 	Field						field;
 	unsigned int				myLastMove;
+	int							myLastTurnNumber,
+								opponentsLastTurnNumber;
 	int							winner;
 	string						winnerName;
 	bool						isDraw;
 
 	void handle(boost::property_tree::ptree message, boost::asio::ip::udp::endpoint from)
 	{
-		auto stage = message.get<int>("stage");
-
-		/// received readiness message
-		if (stage == stageIndex)
+		if (from == opponentEndpoint)
 		{
-			hasBegun = true;
-		}
-		/// received potential move message
-		else if (stage == stageIndex + 1)
-		{
-			keepSendingReadinessMessages = false;
+			auto stage = message.get<int>("stage");
 
-			int column = message.get("column", -1);
-
-			if (column == -1)
+			/// received readiness message
+			if (stage == stageIndex)
 			{
+				hasBegun = true;
 			}
-			/// received move message
-			else if (!myTurn)
+			/// received potential move message
+			else if (stage == stageIndex + 1)
 			{
-				if (receiveMoves)
-				{
-					if (column >= 1 && column <= FIELD_WIDTH && receiveMoves)
-					{
-						if (field.insert(column, 0))
-						{
-							console() << "PLAYER " << opponentName << " MADE HIS MOVE IN COLUMN " << column << "!" << std::endl;
-							myTurn = true;
+				keepSendingReadinessMessages = false;
 
-							noCommunicationTimer.start();
+				int column = message.get("column", -1);
+				int turnNumber = message.get("turn", -1);
 
-							receiveMoves = false;
-
-							checkForWinner();
-						}
-						else
-						{
-							console() << "PLAYER " << opponentName << " TRIED TO USE COLUMN " << column << " ALTHOUGH IT IS FULL!" << std::endl;
-						}
-					}
-					else
-					{
-						console() << "PLAYER " << opponentName << " TRIED TO USE INVALID COLUMN " << column << "!" << std::endl;
-					}
-				}
-				else
-				{
-					console() << "PLAYER " << opponentName << " SENT MOVE ON COLUMN " << column << " >> IGNORED!" << std::endl;
-				}
-			}
-			else
-			{
 				noCommunicationTimer.stop();
 				noCommunicationTimer.start();
 
-				console() << "PLAYER " << opponentName << " SENT KEEP-ALIVE MESSAGE!" << std::endl;
+				if (turnNumber <= opponentsLastTurnNumber)
+				{
+					console() << "PLAYER " << opponentName << " SENT KEEP-ALIVE MESSAGE!" << std::endl;
+					return;
+				}
+
+				if (myTurn)
+				{
+					return;
+				}
+
+				if (column < 1 || column > FIELD_WIDTH)
+				{
+					console() << "PLAYER " << opponentName << " TRIED TO USE INVALID COLUMN " << column << "!" << std::endl;
+					return;
+				}
+
+				if (!field.insert(column, 0))
+				{
+					console() << "PLAYER " << opponentName << " TRIED TO USE COLUMN " << column << " ALTHOUGH IT IS FULL!" << std::endl;
+					return;
+				}
+
+				console() << "PLAYER " << opponentName << " MADE HIS MOVE IN COLUMN " << column << "!" << std::endl;
+
+				myTurn = true;
+				opponentsLastTurnNumber = turnNumber;
+				checkForWinner();
 			}
-		}
-		/// received abortion message
-		else if (stage == ABORTION_STAGE)
-		{
-			abortGame(true);
+			/// received abortion message
+			else if (stage == ABORTION_STAGE)
+			{
+				abortGame(true);
+			}
 		}
 	}
 
@@ -265,11 +252,8 @@ private:
 	bool hasTimedOut() const
 	{
 		bool timedOut = (
-			hasBegun &&
-			(
-				(myTurn && noCommunicationTimer.getSeconds() > secondsToWaitForNextCommunication) ||
-				(!myTurn && noMoveTimer.getSeconds() > secondsToWaitForNextMove)
-			)
+			(noCommunicationTimer.getSeconds() > secondsToWaitForNextCommunication) ||
+			(hasBegun && !myTurn && noMoveTimer.getSeconds() > secondsToWaitForNextMove)
 		);
 
 		if (timedOut)
@@ -297,6 +281,7 @@ private:
 			.createMessage()
 			.add("stage", stageIndex + 1)
 			.add("column", column)
+			.add("turn", myLastTurnNumber)
 			.makeJSON()
 			.unicast();
 	}
