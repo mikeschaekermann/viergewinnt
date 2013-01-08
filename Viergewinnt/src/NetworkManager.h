@@ -71,7 +71,11 @@ private:
 	ip::udp::endpoint		ownPublicEndpoint;
 	ip::udp::endpoint		unicastEndpoint;
 	ip::udp::endpoint		broadcastEndpoint;
-	
+	vector
+	<
+		boost::asio::ip::udp::endpoint
+	>						localEndpoints;
+
 	/// list of message handlers that are called upon message reception
 	std::set
 	<

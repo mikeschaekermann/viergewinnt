@@ -177,9 +177,7 @@ public:
 					activeOpponent = opponents.end();
 				}
 
-				opponents.erase(it);
-
-				if (opponents.size() == 0) break;
+				it = opponents.erase(it);
 			}
 			else
 			{
@@ -270,30 +268,22 @@ private:
 		{
 			bool isMessageFromMyself = false;
 
-			try
+			if (!isMessageFromMyself)
 			{
-				auto senderID = message.get<unsigned int>("senderid");
-				isMessageFromMyself = senderID != localIdentificationNumber;
-			}
-			catch (...)
-			{
-				if (!isMessageFromMyself)
+				Player opponent(message.get<string>("clientname"), from);
+
+				opponentsMutex.lock();
+
+				if (existingOpponent != opponents.end())
 				{
-					Player opponent(message.get<string>("clientname"), from);
-
-					opponentsMutex.lock();
-
-					if (existingOpponent != opponents.end())
-					{
-						existingOpponent->refresh(opponent);
-					}
-					else
-					{
-						opponents.push_back(opponent);
-					}
-
-					opponentsMutex.unlock();
+					existingOpponent->refresh(opponent);
 				}
+				else
+				{
+					opponents.push_back(opponent);
+				}
+
+				opponentsMutex.unlock();
 			}
 		}
 		else if (stage == stageIndex + 1)
@@ -329,7 +319,6 @@ private:
 			.createMessage()
 			.add("stage", stageIndex)
 			.add("clientname", playerName)
-			.add("senderid", localIdentificationNumber)
 			.makeJSON()
 			.broadcast();
 	}

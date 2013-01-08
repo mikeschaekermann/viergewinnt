@@ -67,6 +67,16 @@ NetworkManager::NetworkManager(void) :
 	socket(ioService, ip::udp::endpoint(ip::udp::v4(), LISTENING_PORT))
 {
 	socket.set_option(socket_base::broadcast(true));
+
+	boost::asio::ip::udp::resolver resolver(ioService);
+	boost::asio::ip::udp::resolver::query query(boost::asio::ip::host_name(), "");
+	boost::asio::ip::udp::resolver::iterator end;
+	boost::system::error_code error = boost::asio::error::host_not_found;
+
+	for (auto it = resolver.resolve(query); error && it != end; ++it)
+	{
+		localEndpoints.push_back((*it).endpoint());
+	}
 }
 
 
@@ -155,17 +165,30 @@ void NetworkManager::listenThreadFunction()
 		}
 		else
 		{
-			console()	<< "new message: " << std::endl
-						<< buffer.c_array() << std::endl;
+			bool fromLocalEndpoint = false;
 
-			handlerMutex.lock();
-
-			for (auto it = handlers.begin(); it != handlers.end(); ++it)
+			for (auto it = localEndpoints.begin(); it != localEndpoints.end(); ++it)
 			{
-				(*it)->handle(message, remote_endpoint);
+				if (it->address() == remote_endpoint.address())
+				{
+					fromLocalEndpoint = true;
+				}
 			}
 
-			handlerMutex.unlock();
+			if (!fromLocalEndpoint)
+			{
+				console()	<< "new message: " << std::endl
+							<< buffer.c_array() << std::endl;
+
+				handlerMutex.lock();
+
+				for (auto it = handlers.begin(); it != handlers.end(); ++it)
+				{
+					(*it)->handle(message, remote_endpoint);
+				}
+
+				handlerMutex.unlock();
+			}
 		}
 	}
 }
